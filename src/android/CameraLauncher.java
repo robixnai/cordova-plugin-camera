@@ -185,7 +185,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
                 }
                 else if ((this.srcType == PHOTOLIBRARY) || (this.srcType == SAVEDPHOTOALBUM)) {
                     // FIXME: Stop always requesting the permission
-                    if(!PermissionHelper.hasPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                    if(!PermissionHelper.hasPermission(this, permissions[0])) {
                         PermissionHelper.requestPermission(this, SAVE_TO_ALBUM_SEC, Manifest.permission.READ_EXTERNAL_STORAGE);
                     } else {
                         this.getImage(this.srcType, destType, encodingType);
@@ -577,9 +577,6 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
                 if (this.encodingType == JPEG) {
                     String exifPath;
                     exifPath = uri.getPath();
-                    //We just finished rotating it by an arbitrary orientation, just make sure it's normal
-                    if(rotate != ExifInterface.ORIENTATION_NORMAL)
-                        exif.resetOrientation();
                     exif.createOutFile(exifPath);
                     exif.writeExifData();
                 }
@@ -592,7 +589,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
             throw new IllegalStateException();
         }
 
-        this.cleanup(FILE_URI, this.imageUri.getFileUri(), galleryUri, bitmap);
+//        this.cleanup(FILE_URI, this.imageUri.getFileUri(), galleryUri, bitmap);
         bitmap = null;
     }
 
@@ -677,80 +674,83 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
                 return;
             }
         }
-        int rotate = 0;
 
-        String fileLocation = FileHelper.getRealPath(uri, this.cordova);
-        LOG.d(LOG_TAG, "File locaton is: " + fileLocation);
+        performCrop(uri, destType, intent);
 
-        // If you ask for video or all media type you will automatically get back a file URI
-        // and there will be no attempt to resize any returned data
-        if (this.mediaType != PICTURE) {
-            this.callbackContext.success(fileLocation);
-        }
-        else {
-            String uriString = uri.toString();
-            // Get the path to the image. Makes loading so much easier.
-            String mimeType = FileHelper.getMimeType(uriString, this.cordova);
-
-            // This is a special case to just return the path as no scaling,
-            // rotating, nor compressing needs to be done
-            if (this.targetHeight == -1 && this.targetWidth == -1 &&
-                    (destType == FILE_URI || destType == NATIVE_URI) && !this.correctOrientation &&
-                    mimeType.equalsIgnoreCase(getMimetypeForFormat(encodingType)))
-            {
-                this.callbackContext.success(uriString);
-            } else {
-                // If we don't have a valid image so quit.
-                if (!("image/jpeg".equalsIgnoreCase(mimeType) || "image/png".equalsIgnoreCase(mimeType))) {
-                    LOG.d(LOG_TAG, "I either have a null image path or bitmap");
-                    this.failPicture("Unable to retrieve path to picture!");
-                    return;
-                }
-                Bitmap bitmap = null;
-                try {
-                    bitmap = getScaledAndRotatedBitmap(uriString);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                if (bitmap == null) {
-                    LOG.d(LOG_TAG, "I either have a null image path or bitmap");
-                    this.failPicture("Unable to create bitmap!");
-                    return;
-                }
-
-                // If sending base64 image back
-                if (destType == DATA_URL) {
-                    this.processPicture(bitmap, this.encodingType);
-                }
-
-                // If sending filename back
-                else if (destType == FILE_URI || destType == NATIVE_URI) {
-                    // Did we modify the image?
-                    if ( (this.targetHeight > 0 && this.targetWidth > 0) ||
-                            (this.correctOrientation && this.orientationCorrected) ||
-                            !mimeType.equalsIgnoreCase(getMimetypeForFormat(encodingType)))
-                    {
-                        try {
-                            String modifiedPath = this.outputModifiedBitmap(bitmap, uri);
-                            // The modified image is cached by the app in order to get around this and not have to delete you
-                            // application cache I'm adding the current system time to the end of the file url.
-                            this.callbackContext.success("file://" + modifiedPath + "?" + System.currentTimeMillis());
-
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            this.failPicture("Error retrieving image.");
-                        }
-                    } else {
-                        this.callbackContext.success(fileLocation);
-                    }
-                }
-                if (bitmap != null) {
-                    bitmap.recycle();
-                    bitmap = null;
-                }
-                System.gc();
-            }
-        }
+//        int rotate = 0;
+//
+//        String fileLocation = FileHelper.getRealPath(uri, this.cordova);
+//        LOG.d(LOG_TAG, "File locaton is: " + fileLocation);
+//
+//        // If you ask for video or all media type you will automatically get back a file URI
+//        // and there will be no attempt to resize any returned data
+//        if (this.mediaType != PICTURE) {
+//            this.callbackContext.success(fileLocation);
+//        }
+//        else {
+//            String uriString = uri.toString();
+//            // Get the path to the image. Makes loading so much easier.
+//            String mimeType = FileHelper.getMimeType(uriString, this.cordova);
+//
+//            // This is a special case to just return the path as no scaling,
+//            // rotating, nor compressing needs to be done
+//            if (this.targetHeight == -1 && this.targetWidth == -1 &&
+//                    (destType == FILE_URI || destType == NATIVE_URI) && !this.correctOrientation &&
+//                    mimeType.equalsIgnoreCase(getMimetypeForFormat(encodingType)))
+//            {
+//                this.callbackContext.success(uriString);
+//            } else {
+//                // If we don't have a valid image so quit.
+//                if (!("image/jpeg".equalsIgnoreCase(mimeType) || "image/png".equalsIgnoreCase(mimeType))) {
+//                    LOG.d(LOG_TAG, "I either have a null image path or bitmap");
+//                    this.failPicture("Unable to retrieve path to picture!");
+//                    return;
+//                }
+//                Bitmap bitmap = null;
+//                try {
+//                    bitmap = getScaledAndRotatedBitmap(uriString);
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//                if (bitmap == null) {
+//                    LOG.d(LOG_TAG, "I either have a null image path or bitmap");
+//                    this.failPicture("Unable to create bitmap!");
+//                    return;
+//                }
+//
+//                // If sending base64 image back
+//                if (destType == DATA_URL) {
+//                    this.processPicture(bitmap, this.encodingType);
+//                }
+//
+//                // If sending filename back
+//                else if (destType == FILE_URI || destType == NATIVE_URI) {
+//                    // Did we modify the image?
+//                    if ( (this.targetHeight > 0 && this.targetWidth > 0) ||
+//                            (this.correctOrientation && this.orientationCorrected) ||
+//                            !mimeType.equalsIgnoreCase(getMimetypeForFormat(encodingType)))
+//                    {
+//                        try {
+//                            String modifiedPath = this.outputModifiedBitmap(bitmap, uri);
+//                            // The modified image is cached by the app in order to get around this and not have to delete you
+//                            // application cache I'm adding the current system time to the end of the file url.
+//                            this.callbackContext.success("file://" + modifiedPath + "?" + System.currentTimeMillis());
+//
+//                        } catch (Exception e) {
+//                            e.printStackTrace();
+//                            this.failPicture("Error retrieving image.");
+//                        }
+//                    } else {
+//                        this.callbackContext.success(fileLocation);
+//                    }
+//                }
+//                if (bitmap != null) {
+//                    bitmap.recycle();
+//                    bitmap = null;
+//                }
+//                System.gc();
+//            }
+//        }
     }
 
     /**
